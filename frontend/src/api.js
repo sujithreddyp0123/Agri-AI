@@ -14,6 +14,34 @@ export async function recommendFertilizer(payload) {
   return response.json();
 }
 
+export async function registerFarmer(payload) {
+  const response = await fetch(`${API_BASE}/api/farmer/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error("Farmer registration failed");
+  }
+
+  return response.json();
+}
+
+export async function createCropSeason(payload) {
+  const response = await fetch(`${API_BASE}/api/farmer/crop-season`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    throw new Error("Crop season save failed");
+  }
+
+  return response.json();
+}
+
 export async function getPaddyMetadata() {
   const response = await fetch(`${API_BASE}/api/paddy/metadata`);
   if (!response.ok) {

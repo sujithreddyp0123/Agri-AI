@@ -1,10 +1,11 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { CalendarDays, Camera, Home, Leaf, Loader2, Save, Sprout, UserRound } from "lucide-react";
-import { analyzePhoto, getDistrictWeather, getPaddyMetadata, recommendFertilizer } from "./api";
+import { analyzePhoto, createCropSeason, getDistrictWeather, getPaddyMetadata, recommendFertilizer, registerFarmer } from "./api";
 import "./styles.css";
 
 const OTHER_OPTION = "Other / Not listed";
+const todayISO = () => new Date().toISOString().slice(0, 10);
 
 const defaultContext = {
   crop_type: "paddy",
@@ -12,6 +13,7 @@ const defaultContext = {
   season: "kharif",
   state: "AP",
   crop_age_days: 25,
+  sow_date: todayISO(),
   land_acres: 1,
   soil_type: "clay",
   water_source: "canal",
@@ -20,6 +22,7 @@ const defaultContext = {
   village: "",
   mandal_other: "",
   village_other: "",
+  phone: "",
 };
 
 const STATE_OPTIONS = [
@@ -163,6 +166,10 @@ function App() {
   const [fertilizer, setFertilizer] = useState(null);
   const [metadata, setMetadata] = useState({ varieties: [], seasons: [] });
   const [weather, setWeather] = useState(null);
+  const [cropSeason, setCropSeason] = useState(() => {
+    const saved = localStorage.getItem("agri-ai-crop-season");
+    return saved ? JSON.parse(saved) : null;
+  });
   const [preview, setPreview] = useState("");
   const [loading, setLoading] = useState("");
   const [error, setError] = useState("");
@@ -178,8 +185,9 @@ function App() {
       water_source: context.water_source,
       district: context.district,
       mandal: context.mandal,
+      farmer_phone: profile.phone,
     }),
-    [context],
+    [context, profile.phone],
   );
 
   useEffect(() => {
@@ -236,17 +244,59 @@ function App() {
     setContext((current) => ({ ...current, mandal: value, village: nextVillage }));
   }
 
-  function saveProfile() {
+  async function saveProfile() {
     const next = {
       ...context,
       ...profile,
       mandal: resolvedProfileValue(profile, "mandal") || profile.mandal || context.mandal,
       village: resolvedProfileValue(profile, "village") || profile.village || context.village,
     };
-    setProfile(next);
-    setContext((current) => ({ ...current, ...next }));
-    localStorage.setItem("agri-ai-profile", JSON.stringify(next));
-    setTab("home");
+
+    if (!next.name || !next.phone || !next.village || !next.mandal) {
+      setError("Please enter farmer name, phone, mandal, and village.");
+      return;
+    }
+
+    setError("");
+    setLoading("profile");
+
+    try {
+      await registerFarmer({
+        name: next.name,
+        phone: next.phone,
+        village: next.village,
+        mandal: next.mandal,
+        district: next.district,
+      });
+
+      const savedSeason = await createCropSeason({
+        farmer_phone: next.phone,
+        crop_type: next.crop_type,
+        variety: next.variety,
+        sow_date: next.sow_date,
+        land_acres: Number(next.land_acres),
+        soil_type: next.soil_type,
+        water_source: next.water_source,
+        district: next.district,
+        mandal: next.mandal,
+      });
+
+      const nextWithStage = {
+        ...next,
+        crop_age_days: savedSeason.days_since_sowing,
+      };
+
+      setProfile(nextWithStage);
+      setContext((current) => ({ ...current, ...nextWithStage }));
+      setCropSeason(savedSeason);
+      localStorage.setItem("agri-ai-profile", JSON.stringify(nextWithStage));
+      localStorage.setItem("agri-ai-crop-season", JSON.stringify(savedSeason));
+      setTab("home");
+    } catch (err) {
+      setError("Profile save failed. Check that FastAPI is running.");
+    } finally {
+      setLoading("");
+    }
   }
 
   async function onPhotoChange(event) {
@@ -306,6 +356,14 @@ function App() {
             </button>
           </div>
           <WeatherStrip weather={weather} />
+          {cropSeason && (
+            <section className="stage-summary">
+              <p className="eyebrow">Current crop season</p>
+              <strong>{cropSeason.current_stage}</strong>
+              <span className="telugu">{cropSeason.current_stage_telugu}</span>
+              <small>{cropSeason.days_since_sowing} days since sowing • {cropSeason.variety} • {cropSeason.land_acres} acre</small>
+            </section>
+          )}
 
           <div className="action-grid">
             <button className="action-tile" onClick={() => setTab("photo")}>
@@ -359,6 +417,9 @@ function App() {
             <label>Farmer Name
               <input value={profile.name || ""} onChange={(e) => updateProfile("name", e.target.value)} placeholder="Enter farmer name" />
             </label>
+            <label>Phone
+              <input value={profile.phone || ""} onChange={(e) => updateProfile("phone", e.target.value)} inputMode="tel" placeholder="Farmer mobile number" />
+            </label>
             <label>State
               <select value={profile.state || context.state || "AP"} onChange={(e) => updateProfileState(e.target.value)}>
                 {STATE_OPTIONS.map((state) => <option key={state.value} value={state.value}>{state.label}</option>)}
@@ -405,7 +466,13 @@ function App() {
             )}
           </div>
           <FarmContextForm context={context} updateContext={updateContext} metadata={metadata} />
-          <button className="primary-button" onClick={saveProfile}><Save size={18} /> Save Profile</button>
+          <label>Sowing Date
+            <input type="date" value={context.sow_date || todayISO()} onChange={(e) => updateProfile("sow_date", e.target.value)} />
+          </label>
+          <button className="primary-button" onClick={saveProfile} disabled={loading === "profile"}>
+            {loading === "profile" ? <Loader2 className="spin" size={18} /> : <Save size={18} />}
+            Save Profile
+          </button>
         </section>
       )}
 
