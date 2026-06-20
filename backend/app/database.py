@@ -82,6 +82,17 @@ def init_db() -> None:
             )
             """
         )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS otp_codes (
+                phone TEXT PRIMARY KEY,
+                otp TEXT NOT NULL,
+                verified INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                expires_at TEXT NOT NULL
+            )
+            """
+        )
 
 
 def row_to_dict(row: sqlite3.Row) -> dict:

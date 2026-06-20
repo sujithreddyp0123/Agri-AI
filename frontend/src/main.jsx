@@ -1,7 +1,18 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { CalendarDays, Camera, Home, Leaf, Loader2, Save, Sprout, UserRound } from "lucide-react";
-import { analyzePhoto, createCropSeason, getDistrictWeather, getPaddyMetadata, recommendFertilizer, registerFarmer } from "./api";
+import { CalendarDays, Camera, Check, ClipboardList, Home, Leaf, Loader2, Save, Sprout, UserRound, X } from "lucide-react";
+import {
+  analyzePhoto,
+  createCropSeason,
+  getDistrictWeather,
+  getFarmerHistory,
+  getPaddyMetadata,
+  recommendFertilizer,
+  registerFarmer,
+  requestOtp,
+  saveDiagnosisFeedback,
+  verifyOtp,
+} from "./api";
 import "./styles.css";
 
 const OTHER_OPTION = "Other / Not listed";
@@ -173,6 +184,11 @@ function App() {
   const [preview, setPreview] = useState("");
   const [loading, setLoading] = useState("");
   const [error, setError] = useState("");
+  const [history, setHistory] = useState([]);
+  const [otp, setOtp] = useState("");
+  const [devOtp, setDevOtp] = useState("");
+  const [otpVerified, setOtpVerified] = useState(() => localStorage.getItem("agri-ai-otp-verified") === "true");
+  const [feedbackText, setFeedbackText] = useState("");
 
   const farmContext = useMemo(
     () => ({
@@ -207,6 +223,12 @@ function App() {
   }
 
   function updateProfile(key, value) {
+    if (key === "phone" && value !== profile.phone) {
+      setOtp("");
+      setDevOtp("");
+      setOtpVerified(false);
+      localStorage.removeItem("agri-ai-otp-verified");
+    }
     setProfile((current) => ({ ...current, [key]: value }));
     setContext((current) => ({ ...current, [key]: value }));
   }
@@ -257,6 +279,11 @@ function App() {
       return;
     }
 
+    if (!otpVerified) {
+      setError("Please verify phone OTP before saving profile.");
+      return;
+    }
+
     setError("");
     setLoading("profile");
 
@@ -299,6 +326,92 @@ function App() {
     }
   }
 
+  async function sendOtp() {
+    if (!profile.phone) {
+      setError("Enter phone number first.");
+      return;
+    }
+
+    setError("");
+    setLoading("otp");
+
+    try {
+      const result = await requestOtp(profile.phone);
+      setDevOtp(result.dev_otp || "");
+      setError("OTP sent. Use the Dev OTP shown below for local testing.");
+    } catch (err) {
+      setError("OTP send failed. Check that FastAPI is running.");
+    } finally {
+      setLoading("");
+    }
+  }
+
+  async function checkOtp() {
+    if (!profile.phone || !otp) {
+      setError("Enter phone number and OTP.");
+      return;
+    }
+
+    setError("");
+    setLoading("otp-verify");
+
+    try {
+      await verifyOtp(profile.phone, otp);
+      setOtpVerified(true);
+      setDevOtp("");
+      localStorage.setItem("agri-ai-otp-verified", "true");
+      setError("Phone verified. You can save the profile now.");
+    } catch (err) {
+      setError("OTP verification failed. Check the code and try again.");
+    } finally {
+      setLoading("");
+    }
+  }
+
+  async function loadHistory() {
+    if (!profile.phone) {
+      setHistory([]);
+      return;
+    }
+
+    setError("");
+    setLoading("history");
+
+    try {
+      const result = await getFarmerHistory(profile.phone);
+      setHistory(result);
+    } catch (err) {
+      setError("History failed to load. Check that FastAPI is running.");
+    } finally {
+      setLoading("");
+    }
+  }
+
+  async function submitFeedback(isCorrect) {
+    if (!diagnosis?.diagnosis_id) {
+      setError("No saved diagnosis id found for feedback.");
+      return;
+    }
+
+    setError("");
+    setLoading("feedback");
+
+    try {
+      await saveDiagnosisFeedback({
+        diagnosis_id: diagnosis.diagnosis_id,
+        is_correct: isCorrect,
+        farmer_correction_telugu: isCorrect ? null : feedbackText || null,
+        farmer_phone: profile.phone || null,
+      });
+      setFeedbackText("");
+      setError("Feedback saved. This helps improve Agri AI.");
+    } catch (err) {
+      setError("Feedback save failed. Check that FastAPI is running.");
+    } finally {
+      setLoading("");
+    }
+  }
+
   async function onPhotoChange(event) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -311,6 +424,9 @@ function App() {
     try {
       const result = await analyzePhoto(file, farmContext);
       setDiagnosis(result);
+      if (profile.phone) {
+        getFarmerHistory(profile.phone).then(setHistory).catch(() => {});
+      }
     } catch (err) {
       setError("Photo diagnosis failed. Check that FastAPI is running.");
     } finally {
@@ -394,7 +510,15 @@ function App() {
           </label>
           {preview && <img className="preview" src={preview} alt="Uploaded crop preview" />}
           {loading === "photo" && <Loading text="Analyzing photo..." />}
-          {diagnosis && <DiagnosisResult diagnosis={diagnosis} />}
+          {diagnosis && (
+            <DiagnosisResult
+              diagnosis={diagnosis}
+              feedbackText={feedbackText}
+              setFeedbackText={setFeedbackText}
+              submitFeedback={submitFeedback}
+              loading={loading}
+            />
+          )}
         </section>
       )}
 
@@ -420,6 +544,25 @@ function App() {
             <label>Phone
               <input value={profile.phone || ""} onChange={(e) => updateProfile("phone", e.target.value)} inputMode="tel" placeholder="Farmer mobile number" />
             </label>
+            <div className="otp-row">
+              <button className="secondary-button" onClick={sendOtp} disabled={loading === "otp"}>
+                {loading === "otp" ? "Sending..." : "Send OTP"}
+              </button>
+              <span className={otpVerified ? "status-ok" : "status-muted"}>
+                {otpVerified ? "Phone verified" : "Not verified"}
+              </span>
+            </div>
+            {devOtp && <div className="dev-otp">Dev OTP: <strong>{devOtp}</strong></div>}
+            {!otpVerified && devOtp && (
+              <div className="otp-row">
+                <label>Enter OTP
+                  <input value={otp} onChange={(e) => setOtp(e.target.value)} inputMode="numeric" placeholder="6 digit OTP" />
+                </label>
+                <button className="secondary-button" onClick={checkOtp} disabled={loading === "otp-verify"}>
+                  {loading === "otp-verify" ? "Checking..." : "Verify"}
+                </button>
+              </div>
+            )}
             <label>State
               <select value={profile.state || context.state || "AP"} onChange={(e) => updateProfileState(e.target.value)}>
                 {STATE_OPTIONS.map((state) => <option key={state.value} value={state.value}>{state.label}</option>)}
@@ -476,6 +619,20 @@ function App() {
         </section>
       )}
 
+      {tab === "history" && (
+        <section className="screen">
+          <div className="screen-title-row">
+            <h2>Diagnosis History</h2>
+            <button className="secondary-button" onClick={loadHistory} disabled={loading === "history"}>
+              {loading === "history" ? "Loading..." : "Refresh"}
+            </button>
+          </div>
+          {!profile.phone && <p className="empty-state">Save profile with phone number first.</p>}
+          {profile.phone && history.length === 0 && <p className="empty-state">No saved diagnoses yet.</p>}
+          {history.map((item) => <HistoryItem key={item.id} item={item} />)}
+        </section>
+      )}
+
       {error && <div className="toast">{error}</div>}
 
       <nav className="bottom-nav">
@@ -483,6 +640,7 @@ function App() {
         <NavButton active={tab === "photo"} onClick={() => setTab("photo")} icon={<Camera size={20} />} label="Photo" />
         <NavButton active={tab === "fertilizer"} onClick={() => setTab("fertilizer")} icon={<Leaf size={20} />} label="Pindi" />
         <NavButton active={tab === "profile"} onClick={() => setTab("profile")} icon={<UserRound size={20} />} label="Profile" />
+        <NavButton active={tab === "history"} onClick={() => { setTab("history"); loadHistory(); }} icon={<ClipboardList size={20} />} label="History" />
       </nav>
     </main>
   );
@@ -550,15 +708,57 @@ function WeatherStrip({ weather }) {
   );
 }
 
-function DiagnosisResult({ diagnosis }) {
+function DiagnosisResult({ diagnosis, feedbackText, setFeedbackText, submitFeedback, loading }) {
+  const confidencePct = Math.round((diagnosis.confidence || 0) * 100);
+  const severity = diagnosis.severity || "unknown";
+
   return (
     <article className="result-card">
       <p className="eyebrow">{diagnosis.source} • confidence {Math.round(diagnosis.confidence * 100)}%</p>
       <h3>{diagnosis.disease}</h3>
+      <span className={`severity ${severity}`}>{severity} - {confidencePct}%</span>
       <p className="telugu">{diagnosis.disease_telugu}</p>
       <p className="telugu">{diagnosis.description_telugu}</p>
+      {diagnosis.needs_expert_review && (
+        <div className="review-alert">Expert review needed before acting on this advice.</div>
+      )}
       <ul>{diagnosis.treatment_steps_telugu.map((step) => <li key={step}>{step}</li>)}</ul>
       <strong className="telugu">{diagnosis.fertilizer_note_telugu}</strong>
+      {diagnosis.diagnosis_id && <small className="diagnosis-id">ID: {diagnosis.diagnosis_id}</small>}
+      <div className="feedback-box">
+        <strong>Was this diagnosis correct?</strong>
+        <textarea
+          value={feedbackText}
+          onChange={(e) => setFeedbackText(e.target.value)}
+          placeholder="If wrong, type the correction here. Example: This is zinc deficiency."
+        />
+        <div className="feedback-actions">
+          <button className="secondary-button success" onClick={() => submitFeedback(true)} disabled={loading === "feedback"}>
+            <Check size={16} /> Correct
+          </button>
+          <button className="secondary-button danger" onClick={() => submitFeedback(false)} disabled={loading === "feedback"}>
+            <X size={16} /> Wrong
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function HistoryItem({ item }) {
+  const confidencePct = Math.round((item.confidence || 0) * 100);
+  const created = item.created_at ? new Date(item.created_at).toLocaleString() : "";
+
+  return (
+    <article className="history-item">
+      <div>
+        <strong>{item.disease_detected || "Unknown diagnosis"}</strong>
+        <p className="telugu">{item.disease_telugu || "తెలియదు"}</p>
+        <small>{item.variety} - {item.crop_age_days} days - {confidencePct}% confidence</small>
+      </div>
+      <span className={`severity ${item.severity || "unknown"}`}>{item.severity || "unknown"}</span>
+      {item.needs_expert_review ? <em>Needs expert review</em> : <em>AI confident</em>}
+      <small>{created}</small>
     </article>
   );
 }

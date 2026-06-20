@@ -67,6 +67,21 @@ class DiagnosisFeedback(BaseModel):
     farmer_phone: str | None = None
 
 
+class OTPRequest(BaseModel):
+    phone: str
+
+
+class OTPVerify(BaseModel):
+    phone: str
+    otp: str
+
+
+class OTPResponse(BaseModel):
+    sent: bool
+    phone: str
+    dev_otp: str | None = None
+
+
 class FertilizerItem(BaseModel):
     name: str
     qty_per_acre_kg: float

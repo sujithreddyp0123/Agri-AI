@@ -1,4 +1,5 @@
-from datetime import date
+from datetime import date, datetime, timedelta
+import random
 import uuid
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
@@ -17,6 +18,9 @@ from app.models import (
     FarmContext,
     FertilizerRequest,
     FertilizerResponse,
+    OTPRequest,
+    OTPResponse,
+    OTPVerify,
 )
 from app.recommendations import recommend_fertilizer
 from app.varieties import PADDY_SEASONS, PADDY_VARIETIES
@@ -56,6 +60,51 @@ def detect_stage(days_since_sowing: int) -> tuple[str, str]:
     if days_since_sowing <= 110:
         return "Grain filling", "గింజలు నిండే దశ"
     return "Harvest", "కోత దశ"
+
+
+def generate_otp() -> str:
+    return f"{random.randint(100000, 999999)}"
+
+
+@app.post("/api/auth/request-otp", response_model=OTPResponse)
+async def request_otp(request: OTPRequest) -> OTPResponse:
+    otp = generate_otp()
+    expires_at = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
+
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO otp_codes (phone, otp, verified, expires_at)
+            VALUES (?, ?, 0, ?)
+            ON CONFLICT(phone) DO UPDATE SET
+                otp = excluded.otp,
+                verified = 0,
+                created_at = CURRENT_TIMESTAMP,
+                expires_at = excluded.expires_at
+            """,
+            (request.phone, otp, expires_at),
+        )
+
+    return OTPResponse(sent=True, phone=request.phone, dev_otp=otp)
+
+
+@app.post("/api/auth/verify-otp")
+async def verify_otp(request: OTPVerify) -> dict[str, bool]:
+    with get_connection() as conn:
+        row = conn.execute("SELECT otp, expires_at FROM otp_codes WHERE phone = ?", (request.phone,)).fetchone()
+
+        if not row:
+            raise HTTPException(status_code=404, detail="OTP not requested")
+
+        if datetime.fromisoformat(row["expires_at"]) < datetime.utcnow():
+            raise HTTPException(status_code=400, detail="OTP expired")
+
+        if row["otp"] != request.otp:
+            raise HTTPException(status_code=400, detail="Invalid OTP")
+
+        conn.execute("UPDATE otp_codes SET verified = 1 WHERE phone = ?", (request.phone,))
+
+    return {"verified": True}
 
 
 @app.post("/api/farmer/register", response_model=FarmerResponse)
