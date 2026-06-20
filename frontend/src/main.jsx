@@ -14,6 +14,7 @@ const defaultContext = {
   soil_type: "clay",
   water_source: "canal",
   district: "Nellore",
+  mandal: "Kavali",
   village: "",
 };
 
@@ -50,6 +51,85 @@ const DISTRICTS_BY_STATE = {
   ],
 };
 
+const MANDALS_BY_DISTRICT = {
+  Nellore: [
+    "Kavali",
+    "Nellore Rural",
+    "Nellore Urban",
+    "Kovur",
+    "Gudur",
+    "Atmakur",
+    "Naidupeta",
+    "Sullurpeta",
+    "Udayagiri",
+    "Venkatagiri",
+    "Buchireddypalem",
+    "Dagadarthi",
+    "Muthukur",
+    "Tada",
+    "Rapur",
+  ],
+  Krishna: ["Vijayawada Rural", "Gudivada", "Pedana", "Machilipatnam", "Avanigadda", "Penamaluru"],
+  Guntur: ["Tenali", "Repalle", "Mangalagiri", "Tadikonda", "Prathipadu", "Ponnur"],
+  "East Godavari": ["Rajahmundry Rural", "Kakinada Rural", "Amalapuram", "Ramachandrapuram", "Peddapuram"],
+  "West Godavari": ["Eluru", "Bhimavaram", "Tadepalligudem", "Tanuku", "Palakollu"],
+  Srikakulam: ["Srikakulam", "Amadalavalasa", "Tekkali", "Palasa", "Narasannapeta"],
+  Vizianagaram: ["Vizianagaram", "Bobbili", "Parvathipuram", "Cheepurupalli", "Gajapathinagaram"],
+  Visakhapatnam: ["Visakhapatnam Rural", "Anakapalle", "Bheemunipatnam", "Pendurthi", "Narsipatnam"],
+  Prakasam: ["Ongole", "Kandukur", "Markapur", "Chirala", "Addanki"],
+  Kurnool: ["Kurnool", "Nandyal", "Adoni", "Yemmiganur", "Dhone"],
+  Kadapa: ["Kadapa", "Proddatur", "Pulivendula", "Rajampet", "Jammalamadugu"],
+  Anantapur: ["Anantapur", "Hindupur", "Tadipatri", "Dharmavaram", "Guntakal"],
+  Chittoor: ["Chittoor", "Tirupati Rural", "Madanapalle", "Punganur", "Palamaner"],
+  Hyderabad: ["Charminar", "Secunderabad", "Amberpet", "Khairatabad", "Nampally"],
+  Warangal: ["Warangal", "Hanamkonda", "Narsampet", "Parkal", "Wardhannapet"],
+  Karimnagar: ["Karimnagar", "Huzurabad", "Jammikunta", "Manakondur", "Choppadandi"],
+  Nizamabad: ["Nizamabad", "Bodhan", "Armoor", "Balkonda", "Dichpally"],
+  Khammam: ["Khammam Rural", "Khammam Urban", "Madhira", "Sathupalli", "Wyra"],
+  Medak: ["Medak", "Narsapur", "Toopran", "Ramayampet", "Papannapet"],
+  Sangareddy: ["Sangareddy", "Zaheerabad", "Narayankhed", "Patancheru", "Andole"],
+  Rangareddy: ["Shamshabad", "Chevella", "Ibrahimpatnam", "Rajendranagar", "Shankarpally"],
+};
+
+const VILLAGES_BY_MANDAL = {
+  Kavali: ["Kavali", "Maddurupadu", "Rudrakota", "Chennayapalem", "Thummalapenta", "Musunuru"],
+  "Nellore Rural": ["Kakupalli", "Ambapuram", "Devarapalem", "Kothur", "South Mopur"],
+  "Nellore Urban": ["Nellore", "Balaji Nagar", "Stonehouse Pet", "Santhapeta"],
+  Kovur: ["Kovur", "Padugupadu", "Inamadugu", "Leguntapadu", "Pothireddypalem"],
+  Gudur: ["Gudur", "Chennuru", "Vendodu", "Nellatur", "Kandali"],
+  Atmakur: ["Atmakur", "Anumasamudrampeta", "Chejerla", "Marripadu"],
+  Naidupeta: ["Naidupeta", "Menakur", "Pudur", "Thummuru"],
+  Sullurpeta: ["Sullurpeta", "Mannemutheri", "Mangalampadu", "Damaraya"],
+  Udayagiri: ["Udayagiri", "Appasamudram", "Krishnampalli", "Gandipalem"],
+  Venkatagiri: ["Venkatagiri", "Althurupadu", "Bangarupeta", "Kalikiri"],
+  Buchireddypalem: ["Buchireddypalem", "Jonnawada", "Rebala", "Damaramadugu"],
+  Dagadarthi: ["Dagadarthi", "Damavaram", "Velupodu", "Manubolu"],
+  Muthukur: ["Muthukur", "Krishnapatnam", "Pynapuram", "Musunuru"],
+  Tada: ["Tada", "Sricity", "Konduru", "Ramapuram"],
+  Rapur: ["Rapur", "Penubarthi", "Tegacherla", "Gonupalli"],
+  "Vijayawada Rural": ["Nidamanuru", "Ramavarappadu", "Prasadampadu", "Gannavaram"],
+  Gudivada: ["Gudivada", "Bethavolu", "Seridintakurru", "Chowtapalli"],
+  Tenali: ["Tenali", "Angalakuduru", "Burripalem", "Kolakaluru"],
+  Repalle: ["Repalle", "Penuganchiprolu", "Gangadipalem", "Morusumilli"],
+  "Khammam Rural": ["Edulapuram", "Mallemadugu", "Gollagudem", "Polepalli"],
+  "Khammam Urban": ["Khammam", "Burhanpuram", "Rotary Nagar", "Raparthi Nagar"],
+  Sangareddy: ["Sangareddy", "Kandi", "Fasalwadi", "Ismailkhanpet"],
+  Warangal: ["Warangal", "Enumamula", "Mamnoor", "Kashibugga"],
+};
+
+function getDistrictOptions(state) {
+  return DISTRICTS_BY_STATE[state] || DISTRICTS_BY_STATE.AP;
+}
+
+function getMandalOptions(district) {
+  return MANDALS_BY_DISTRICT[district] || [];
+}
+
+function getVillageOptions(mandal) {
+  if (!mandal) return [];
+  return VILLAGES_BY_MANDAL[mandal] || [mandal, "Other / Not listed"];
+}
+
 function App() {
   const [tab, setTab] = useState("home");
   const [profile, setProfile] = useState(() => {
@@ -75,6 +155,7 @@ function App() {
       soil_type: context.soil_type,
       water_source: context.water_source,
       district: context.district,
+      mandal: context.mandal,
     }),
     [context],
   );
@@ -101,9 +182,36 @@ function App() {
   }
 
   function updateProfileState(value) {
-    const nextDistrict = DISTRICTS_BY_STATE[value]?.[0] || "Nellore";
-    setProfile((current) => ({ ...current, state: value, district: nextDistrict }));
-    setContext((current) => ({ ...current, state: value, district: nextDistrict }));
+    const nextDistrict = getDistrictOptions(value)[0] || "Nellore";
+    const nextMandal = getMandalOptions(nextDistrict)[0] || "";
+    const nextVillage = getVillageOptions(nextMandal)[0] || "";
+    setProfile((current) => ({
+      ...current,
+      state: value,
+      district: nextDistrict,
+      mandal: nextMandal,
+      village: nextVillage,
+    }));
+    setContext((current) => ({
+      ...current,
+      state: value,
+      district: nextDistrict,
+      mandal: nextMandal,
+      village: nextVillage,
+    }));
+  }
+
+  function updateProfileDistrict(value) {
+    const nextMandal = getMandalOptions(value)[0] || "";
+    const nextVillage = getVillageOptions(nextMandal)[0] || "";
+    setProfile((current) => ({ ...current, district: value, mandal: nextMandal, village: nextVillage }));
+    setContext((current) => ({ ...current, district: value, mandal: nextMandal, village: nextVillage }));
+  }
+
+  function updateProfileMandal(value) {
+    const nextVillage = getVillageOptions(value)[0] || "";
+    setProfile((current) => ({ ...current, mandal: value, village: nextVillage }));
+    setContext((current) => ({ ...current, mandal: value, village: nextVillage }));
   }
 
   function saveProfile() {
@@ -164,7 +272,7 @@ function App() {
             <div>
               <p className="eyebrow">Current field</p>
               <h2>{profile.name || "Farmer profile not set"}</h2>
-              <span>{profile.village || "Add village"} • {profile.district || context.district} • {profile.state || context.state} • {context.variety} • {context.land_acres} acre</span>
+              <span>{profile.village || "Add village"} • {profile.mandal || context.mandal} • {profile.district || context.district} • {profile.state || context.state} • {context.variety} • {context.land_acres} acre</span>
             </div>
             <button className="icon-button" onClick={() => setTab("profile")} aria-label="Edit profile">
               <UserRound size={20} />
@@ -230,14 +338,25 @@ function App() {
               </select>
             </label>
             <label>District
-              <select value={profile.district || context.district} onChange={(e) => updateProfile("district", e.target.value)}>
-                {(DISTRICTS_BY_STATE[profile.state || context.state || "AP"] || DISTRICTS_BY_STATE.AP).map((district) => (
+              <select value={profile.district || context.district} onChange={(e) => updateProfileDistrict(e.target.value)}>
+                {getDistrictOptions(profile.state || context.state || "AP").map((district) => (
                   <option key={district} value={district}>{district}</option>
                 ))}
               </select>
             </label>
+            <label>Mandal
+              <select value={profile.mandal || context.mandal || ""} onChange={(e) => updateProfileMandal(e.target.value)}>
+                {getMandalOptions(profile.district || context.district).map((mandal) => (
+                  <option key={mandal} value={mandal}>{mandal}</option>
+                ))}
+              </select>
+            </label>
             <label>Village
-              <input value={profile.village || ""} onChange={(e) => updateProfile("village", e.target.value)} placeholder="Enter village name" />
+              <select value={profile.village || context.village || ""} onChange={(e) => updateProfile("village", e.target.value)}>
+                {getVillageOptions(profile.mandal || context.mandal).map((village) => (
+                  <option key={village} value={village}>{village}</option>
+                ))}
+              </select>
             </label>
           </div>
           <FarmContextForm context={context} updateContext={updateContext} metadata={metadata} />
