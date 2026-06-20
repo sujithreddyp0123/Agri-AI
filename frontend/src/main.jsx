@@ -8,18 +8,53 @@ const defaultContext = {
   crop_type: "paddy",
   variety: "BPT 5204",
   season: "kharif",
+  state: "AP",
   crop_age_days: 25,
   land_acres: 1,
   soil_type: "clay",
   water_source: "canal",
   district: "Nellore",
+  village: "",
+};
+
+const STATE_OPTIONS = [
+  { value: "AP", label: "Andhra Pradesh" },
+  { value: "TS", label: "Telangana" },
+];
+
+const DISTRICTS_BY_STATE = {
+  AP: [
+    "Nellore",
+    "Krishna",
+    "Guntur",
+    "East Godavari",
+    "West Godavari",
+    "Srikakulam",
+    "Vizianagaram",
+    "Visakhapatnam",
+    "Prakasam",
+    "Kurnool",
+    "Kadapa",
+    "Anantapur",
+    "Chittoor",
+  ],
+  TS: [
+    "Hyderabad",
+    "Warangal",
+    "Karimnagar",
+    "Nizamabad",
+    "Khammam",
+    "Medak",
+    "Sangareddy",
+    "Rangareddy",
+  ],
 };
 
 function App() {
   const [tab, setTab] = useState("home");
   const [profile, setProfile] = useState(() => {
     const saved = localStorage.getItem("agri-ai-profile");
-    return saved ? JSON.parse(saved) : { name: "", village: "", ...defaultContext };
+    return saved ? { ...defaultContext, ...JSON.parse(saved) } : { name: "", ...defaultContext };
   });
   const [context, setContext] = useState({ ...defaultContext, ...profile });
   const [diagnosis, setDiagnosis] = useState(null);
@@ -60,9 +95,21 @@ function App() {
     setContext((current) => ({ ...current, [key]: value }));
   }
 
+  function updateProfile(key, value) {
+    setProfile((current) => ({ ...current, [key]: value }));
+    setContext((current) => ({ ...current, [key]: value }));
+  }
+
+  function updateProfileState(value) {
+    const nextDistrict = DISTRICTS_BY_STATE[value]?.[0] || "Nellore";
+    setProfile((current) => ({ ...current, state: value, district: nextDistrict }));
+    setContext((current) => ({ ...current, state: value, district: nextDistrict }));
+  }
+
   function saveProfile() {
-    const next = { ...profile, ...context };
+    const next = { ...context, ...profile };
     setProfile(next);
+    setContext((current) => ({ ...current, ...next }));
     localStorage.setItem("agri-ai-profile", JSON.stringify(next));
     setTab("home");
   }
@@ -117,7 +164,7 @@ function App() {
             <div>
               <p className="eyebrow">Current field</p>
               <h2>{profile.name || "Farmer profile not set"}</h2>
-              <span>{profile.village || "Add village"} • {context.variety} • {context.land_acres} acre</span>
+              <span>{profile.village || "Add village"} • {profile.district || context.district} • {profile.state || context.state} • {context.variety} • {context.land_acres} acre</span>
             </div>
             <button className="icon-button" onClick={() => setTab("profile")} aria-label="Edit profile">
               <UserRound size={20} />
@@ -173,8 +220,26 @@ function App() {
       {tab === "profile" && (
         <section className="screen">
           <h2>Farm Profile</h2>
-          <label>Name<input value={profile.name} onChange={(e) => setProfile({ ...profile, name: e.target.value })} /></label>
-          <label>Village<input value={profile.village} onChange={(e) => setProfile({ ...profile, village: e.target.value })} /></label>
+          <div className="profile-card">
+            <label>Farmer Name
+              <input value={profile.name || ""} onChange={(e) => updateProfile("name", e.target.value)} placeholder="Enter farmer name" />
+            </label>
+            <label>State
+              <select value={profile.state || context.state || "AP"} onChange={(e) => updateProfileState(e.target.value)}>
+                {STATE_OPTIONS.map((state) => <option key={state.value} value={state.value}>{state.label}</option>)}
+              </select>
+            </label>
+            <label>District
+              <select value={profile.district || context.district} onChange={(e) => updateProfile("district", e.target.value)}>
+                {(DISTRICTS_BY_STATE[profile.state || context.state || "AP"] || DISTRICTS_BY_STATE.AP).map((district) => (
+                  <option key={district} value={district}>{district}</option>
+                ))}
+              </select>
+            </label>
+            <label>Village
+              <input value={profile.village || ""} onChange={(e) => updateProfile("village", e.target.value)} placeholder="Enter village name" />
+            </label>
+          </div>
           <FarmContextForm context={context} updateContext={updateContext} metadata={metadata} />
           <button className="primary-button" onClick={saveProfile}><Save size={18} /> Save Profile</button>
         </section>
@@ -236,7 +301,6 @@ function FarmContextForm({ context, updateContext, metadata, compact = false }) 
           <option value="unknown">Unknown</option>
         </select>
       </label>
-      <label>District<input value={context.district} onChange={(e) => updateContext("district", e.target.value)} /></label>
     </div>
   );
 }
