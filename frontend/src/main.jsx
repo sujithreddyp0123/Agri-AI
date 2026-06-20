@@ -4,6 +4,8 @@ import { CalendarDays, Camera, Home, Leaf, Loader2, Save, Sprout, UserRound } fr
 import { analyzePhoto, getDistrictWeather, getPaddyMetadata, recommendFertilizer } from "./api";
 import "./styles.css";
 
+const OTHER_OPTION = "Other / Not listed";
+
 const defaultContext = {
   crop_type: "paddy",
   variety: "BPT 5204",
@@ -16,6 +18,8 @@ const defaultContext = {
   district: "Nellore",
   mandal: "Kavali",
   village: "",
+  mandal_other: "",
+  village_other: "",
 };
 
 const STATE_OPTIONS = [
@@ -53,21 +57,32 @@ const DISTRICTS_BY_STATE = {
 
 const MANDALS_BY_DISTRICT = {
   Nellore: [
+    "Allur",
+    "Ananthasagaram",
+    "Atmakur",
+    "Bogole",
+    "Buchireddypalem",
+    "Chejerla",
+    "Dagadarthi",
+    "Duttalur",
+    "Indukurpet",
+    "Jaladanki",
+    "Kaligiri",
     "Kavali",
+    "Kodavalur",
+    "Kondapuram",
+    "Kovur",
+    "Marripadu",
     "Nellore Rural",
     "Nellore Urban",
-    "Kovur",
-    "Gudur",
-    "Atmakur",
-    "Naidupeta",
-    "Sullurpeta",
+    "Podalakur",
+    "Sangam",
+    "Seetharamapuram",
+    "Thotapalligudur",
     "Udayagiri",
-    "Venkatagiri",
-    "Buchireddypalem",
-    "Dagadarthi",
     "Muthukur",
-    "Tada",
-    "Rapur",
+    "Vidavalur",
+    "Vinjamur",
   ],
   Krishna: ["Vijayawada Rural", "Gudivada", "Pedana", "Machilipatnam", "Avanigadda", "Penamaluru"],
   Guntur: ["Tenali", "Repalle", "Mangalagiri", "Tadikonda", "Prathipadu", "Ponnur"],
@@ -122,12 +137,19 @@ function getDistrictOptions(state) {
 }
 
 function getMandalOptions(district) {
-  return MANDALS_BY_DISTRICT[district] || [];
+  return [...(MANDALS_BY_DISTRICT[district] || []), OTHER_OPTION];
 }
 
 function getVillageOptions(mandal) {
   if (!mandal) return [];
-  return VILLAGES_BY_MANDAL[mandal] || [mandal, "Other / Not listed"];
+  if (mandal === OTHER_OPTION) return [OTHER_OPTION];
+  return [...(VILLAGES_BY_MANDAL[mandal] || [mandal]), OTHER_OPTION];
+}
+
+function resolvedProfileValue(profile, key) {
+  if (key === "mandal" && profile.mandal === OTHER_OPTION) return profile.mandal_other || "";
+  if (key === "village" && profile.village === OTHER_OPTION) return profile.village_other || "";
+  return profile[key] || "";
 }
 
 function App() {
@@ -215,7 +237,12 @@ function App() {
   }
 
   function saveProfile() {
-    const next = { ...context, ...profile };
+    const next = {
+      ...context,
+      ...profile,
+      mandal: resolvedProfileValue(profile, "mandal") || profile.mandal || context.mandal,
+      village: resolvedProfileValue(profile, "village") || profile.village || context.village,
+    };
     setProfile(next);
     setContext((current) => ({ ...current, ...next }));
     localStorage.setItem("agri-ai-profile", JSON.stringify(next));
@@ -272,7 +299,7 @@ function App() {
             <div>
               <p className="eyebrow">Current field</p>
               <h2>{profile.name || "Farmer profile not set"}</h2>
-              <span>{profile.village || "Add village"} • {profile.mandal || context.mandal} • {profile.district || context.district} • {profile.state || context.state} • {context.variety} • {context.land_acres} acre</span>
+              <span>{resolvedProfileValue(profile, "village") || "Add village"} • {resolvedProfileValue(profile, "mandal") || profile.mandal || context.mandal} • {profile.district || context.district} • {profile.state || context.state} • {context.variety} • {context.land_acres} acre</span>
             </div>
             <button className="icon-button" onClick={() => setTab("profile")} aria-label="Edit profile">
               <UserRound size={20} />
@@ -351,6 +378,15 @@ function App() {
                 ))}
               </select>
             </label>
+            {(profile.mandal || context.mandal) === OTHER_OPTION && (
+              <label>Mandal Name
+                <input
+                  value={profile.mandal_other || ""}
+                  onChange={(e) => updateProfile("mandal_other", e.target.value)}
+                  placeholder="Type mandal name"
+                />
+              </label>
+            )}
             <label>Village
               <select value={profile.village || context.village || ""} onChange={(e) => updateProfile("village", e.target.value)}>
                 {getVillageOptions(profile.mandal || context.mandal).map((village) => (
@@ -358,6 +394,15 @@ function App() {
                 ))}
               </select>
             </label>
+            {(profile.village || context.village) === OTHER_OPTION && (
+              <label>Village Name
+                <input
+                  value={profile.village_other || ""}
+                  onChange={(e) => updateProfile("village_other", e.target.value)}
+                  placeholder="Type village name"
+                />
+              </label>
+            )}
           </div>
           <FarmContextForm context={context} updateContext={updateContext} metadata={metadata} />
           <button className="primary-button" onClick={saveProfile}><Save size={18} /> Save Profile</button>
