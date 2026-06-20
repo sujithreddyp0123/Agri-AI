@@ -212,7 +212,28 @@ async def farmer_history(phone: str) -> list[dict]:
             """
             SELECT id, farmer_phone, crop_type, variety, crop_age_days,
                    disease_detected, disease_telugu, severity, confidence,
-                   needs_expert_review, photo_path, created_at
+                   needs_expert_review, photo_path, created_at,
+                   (
+                       SELECT is_correct
+                       FROM diagnosis_feedback
+                       WHERE diagnosis_feedback.diagnosis_id = diagnoses.id
+                       ORDER BY created_at DESC
+                       LIMIT 1
+                   ) AS feedback_is_correct,
+                   (
+                       SELECT farmer_correction_telugu
+                       FROM diagnosis_feedback
+                       WHERE diagnosis_feedback.diagnosis_id = diagnoses.id
+                       ORDER BY created_at DESC
+                       LIMIT 1
+                   ) AS feedback_correction_telugu,
+                   (
+                       SELECT created_at
+                       FROM diagnosis_feedback
+                       WHERE diagnosis_feedback.diagnosis_id = diagnoses.id
+                       ORDER BY created_at DESC
+                       LIMIT 1
+                   ) AS feedback_created_at
             FROM diagnoses
             WHERE farmer_phone = ?
             ORDER BY created_at DESC

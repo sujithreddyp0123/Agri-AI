@@ -189,6 +189,7 @@ function App() {
   const [devOtp, setDevOtp] = useState("");
   const [otpVerified, setOtpVerified] = useState(() => localStorage.getItem("agri-ai-otp-verified") === "true");
   const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackStatus, setFeedbackStatus] = useState("");
 
   const farmContext = useMemo(
     () => ({
@@ -393,6 +394,11 @@ function App() {
       return;
     }
 
+    if (!isCorrect && !feedbackText.trim()) {
+      setError("Please type the correct diagnosis or note before marking wrong.");
+      return;
+    }
+
     setError("");
     setLoading("feedback");
 
@@ -400,10 +406,19 @@ function App() {
       await saveDiagnosisFeedback({
         diagnosis_id: diagnosis.diagnosis_id,
         is_correct: isCorrect,
-        farmer_correction_telugu: isCorrect ? null : feedbackText || null,
+        farmer_correction_telugu: isCorrect ? null : feedbackText.trim(),
         farmer_phone: profile.phone || null,
       });
+      setFeedbackStatus(isCorrect ? "Marked correct" : "Correction saved");
+      setDiagnosis((current) => current ? {
+        ...current,
+        feedback_is_correct: isCorrect ? 1 : 0,
+        feedback_correction_telugu: isCorrect ? null : feedbackText.trim(),
+      } : current);
       setFeedbackText("");
+      if (profile.phone) {
+        getFarmerHistory(profile.phone).then(setHistory).catch(() => {});
+      }
       setError("Feedback saved. This helps improve Agri AI.");
     } catch (err) {
       setError("Feedback save failed. Check that FastAPI is running.");
@@ -418,6 +433,8 @@ function App() {
 
     setPreview(URL.createObjectURL(file));
     setDiagnosis(null);
+    setFeedbackStatus("");
+    setFeedbackText("");
     setError("");
     setLoading("photo");
 
@@ -502,6 +519,16 @@ function App() {
         <section className="screen">
           <h2>Photo Diagnosis</h2>
           <FarmContextForm context={context} updateContext={updateContext} metadata={metadata} compact />
+          <div className="photo-context">
+            <span>{context.variety}</span>
+            <span>{context.crop_age_days} days</span>
+            <span>{context.soil_type} soil</span>
+            <span>{context.district}</span>
+          </div>
+          <div className="photo-tips">
+            <strong>Good photo gives better advice</strong>
+            <span>Use daylight, focus on one damaged leaf, and avoid blurry long-distance crop photos.</span>
+          </div>
           <label className="upload-zone">
             <Camera size={42} />
             <strong>Take or upload crop photo</strong>
@@ -517,6 +544,8 @@ function App() {
               setFeedbackText={setFeedbackText}
               submitFeedback={submitFeedback}
               loading={loading}
+              feedbackStatus={feedbackStatus}
+              onViewHistory={() => { setTab("history"); loadHistory(); }}
             />
           )}
         </section>
@@ -708,29 +737,41 @@ function WeatherStrip({ weather }) {
   );
 }
 
-function DiagnosisResult({ diagnosis, feedbackText, setFeedbackText, submitFeedback, loading }) {
+function DiagnosisResult({ diagnosis, feedbackText, setFeedbackText, submitFeedback, loading, feedbackStatus, onViewHistory }) {
   const confidencePct = Math.round((diagnosis.confidence || 0) * 100);
   const severity = diagnosis.severity || "unknown";
+  const hasFeedback = feedbackStatus || diagnosis.feedback_is_correct !== undefined;
 
   return (
     <article className="result-card">
       <p className="eyebrow">{diagnosis.source} • confidence {Math.round(diagnosis.confidence * 100)}%</p>
-      <h3>{diagnosis.disease}</h3>
-      <span className={`severity ${severity}`}>{severity} - {confidencePct}%</span>
+      <div className="result-heading">
+        <h3>{diagnosis.disease}</h3>
+        <span className={`severity ${severity}`}>{severity}</span>
+      </div>
+      <div className="confidence-meter" aria-label={`Confidence ${confidencePct}%`}>
+        <span style={{ width: `${confidencePct}%` }} />
+      </div>
       <p className="telugu">{diagnosis.disease_telugu}</p>
       <p className="telugu">{diagnosis.description_telugu}</p>
       {diagnosis.needs_expert_review && (
         <div className="review-alert">Expert review needed before acting on this advice.</div>
       )}
+      {!diagnosis.needs_expert_review && (
+        <div className="review-ok">AI is reasonably confident. Still confirm with local expert for pesticide decisions.</div>
+      )}
       <ul>{diagnosis.treatment_steps_telugu.map((step) => <li key={step}>{step}</li>)}</ul>
       <strong className="telugu">{diagnosis.fertilizer_note_telugu}</strong>
       {diagnosis.diagnosis_id && <small className="diagnosis-id">ID: {diagnosis.diagnosis_id}</small>}
       <div className="feedback-box">
-        <strong>Was this diagnosis correct?</strong>
+        <div className="feedback-heading">
+          <strong>Was this diagnosis correct?</strong>
+          {hasFeedback && <span className="feedback-saved">{feedbackStatus || "Feedback saved"}</span>}
+        </div>
         <textarea
           value={feedbackText}
           onChange={(e) => setFeedbackText(e.target.value)}
-          placeholder="If wrong, type the correction here. Example: This is zinc deficiency."
+          placeholder="If wrong, type the correction here. Example: This is zinc deficiency, not blast."
         />
         <div className="feedback-actions">
           <button className="secondary-button success" onClick={() => submitFeedback(true)} disabled={loading === "feedback"}>
@@ -740,6 +781,7 @@ function DiagnosisResult({ diagnosis, feedbackText, setFeedbackText, submitFeedb
             <X size={16} /> Wrong
           </button>
         </div>
+        <button className="history-link-button" onClick={onViewHistory}>View saved diagnosis history</button>
       </div>
     </article>
   );
@@ -748,6 +790,11 @@ function DiagnosisResult({ diagnosis, feedbackText, setFeedbackText, submitFeedb
 function HistoryItem({ item }) {
   const confidencePct = Math.round((item.confidence || 0) * 100);
   const created = item.created_at ? new Date(item.created_at).toLocaleString() : "";
+  const feedbackLabel = item.feedback_is_correct === null || item.feedback_is_correct === undefined
+    ? "Not reviewed"
+    : item.feedback_is_correct
+      ? "Correct"
+      : "Wrong";
 
   return (
     <article className="history-item">
@@ -757,6 +804,10 @@ function HistoryItem({ item }) {
         <small>{item.variety} - {item.crop_age_days} days - {confidencePct}% confidence</small>
       </div>
       <span className={`severity ${item.severity || "unknown"}`}>{item.severity || "unknown"}</span>
+      <span className={`feedback-pill ${item.feedback_is_correct === 0 ? "wrong" : item.feedback_is_correct === 1 ? "correct" : ""}`}>
+        {feedbackLabel}
+      </span>
+      {item.feedback_correction_telugu && <p className="correction-note">{item.feedback_correction_telugu}</p>}
       {item.needs_expert_review ? <em>Needs expert review</em> : <em>AI confident</em>}
       <small>{created}</small>
     </article>
