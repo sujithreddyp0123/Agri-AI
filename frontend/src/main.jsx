@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { CalendarDays, Camera, Check, ClipboardList, Home, Leaf, Loader2, Save, Sprout, UserRound, X } from "lucide-react";
+import { CalendarDays, Camera, Check, ClipboardList, Home, Languages, Leaf, Loader2, Save, Sprout, UserRound, X } from "lucide-react";
 import {
   analyzePhoto,
   createCropSeason,
@@ -166,8 +166,41 @@ function resolvedProfileValue(profile, key) {
   return profile[key] || "";
 }
 
+const APP_COPY = {
+  en: {
+    tagline: "Farmer companion",
+    languageTitle: "Choose your language",
+    languageSubtitle: "You can change this later. Registration stays in English for now.",
+    homeTitle: "What Agri AI can do",
+    homeSubtitle: "Start with your field profile, then use photo diagnosis and pindi advice during the season.",
+    photoTitle: "Photo Diagnosis",
+    photoText: "Upload a crop photo to detect disease, pest, or nutrient deficiency.",
+    pindiTitle: "Pindi Advice",
+    pindiText: "Get fertilizer quantity by crop stage, variety, soil, water, and weather.",
+    historyTitle: "Expert Feedback",
+    historyText: "Your dad or local expert can mark AI answers correct or wrong.",
+  },
+  te: {
+    tagline: "రైతు మిత్రం",
+    languageTitle: "భాష ఎంచుకోండి",
+    languageSubtitle: "తరువాత మార్చుకోవచ్చు. రిజిస్ట్రేషన్ ఇప్పటికి English లో ఉంటుంది.",
+    homeTitle: "Agri AI లో ఏముంది",
+    homeSubtitle: "ముందు మీ పొలం వివరాలు సేవ్ చేయండి. తర్వాత ఫోటో డయాగ్నోసిస్, పిండి సలహా వాడండి.",
+    photoTitle: "ఫోటో డయాగ్నోసిస్",
+    photoText: "ఆకు లేదా పంట ఫోటో పెట్టి రోగం, పురుగు, పోషక లోపం తెలుసుకోండి.",
+    pindiTitle: "పిండి సలహా",
+    pindiText: "పంట దశ, రకం, మట్టి, నీరు, వాతావరణం బట్టి ఎరువు మోతాదు తెలుసుకోండి.",
+    historyTitle: "ఎక్స్‌పర్ట్ ఫీడ్‌బ్యాక్",
+    historyText: "మీ నాన్న లేదా స్థానిక ఎక్స్‌పర్ట్ AI సమాధానం సరైందో కాదో చెప్పగలరు.",
+  },
+};
+
 function App() {
-  const [tab, setTab] = useState("home");
+  const [tab, setTab] = useState(() => {
+    if (!localStorage.getItem("agri-ai-profile")) return "landing";
+    if (!localStorage.getItem("agri-ai-language")) return "language";
+    return "home";
+  });
   const [profile, setProfile] = useState(() => {
     const saved = localStorage.getItem("agri-ai-profile");
     return saved ? { ...defaultContext, ...JSON.parse(saved) } : { name: "", ...defaultContext };
@@ -190,6 +223,10 @@ function App() {
   const [otpVerified, setOtpVerified] = useState(() => localStorage.getItem("agri-ai-otp-verified") === "true");
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackStatus, setFeedbackStatus] = useState("");
+  const [appLanguage, setAppLanguage] = useState(() => localStorage.getItem("agri-ai-language") || "");
+  const copy = APP_COPY[appLanguage || "en"];
+  const isProfileSaved = Boolean(profile.name && profile.phone);
+  const canUseApp = isProfileSaved && Boolean(appLanguage);
 
   const farmContext = useMemo(
     () => ({
@@ -319,12 +356,18 @@ function App() {
       setCropSeason(savedSeason);
       localStorage.setItem("agri-ai-profile", JSON.stringify(nextWithStage));
       localStorage.setItem("agri-ai-crop-season", JSON.stringify(savedSeason));
-      setTab("home");
+      setTab(appLanguage ? "home" : "language");
     } catch (err) {
       setError("Profile save failed. Check that FastAPI is running.");
     } finally {
       setLoading("");
     }
+  }
+
+  function chooseLanguage(language) {
+    setAppLanguage(language);
+    localStorage.setItem("agri-ai-language", language);
+    setTab("home");
   }
 
   async function sendOtp() {
@@ -476,8 +519,49 @@ function App() {
         </div>
       </header>
 
+      {tab === "landing" && (
+        <section className="landing-screen">
+          <div className="landing-hero">
+            <span className="eyebrow">For AP and Telangana farmers</span>
+            <h2>Agri AI</h2>
+            <p>Crop photo diagnosis, pindi advice, live weather, and expert feedback in one simple farmer app.</p>
+            <button className="primary-button" onClick={() => setTab("profile")}>
+              Create Farmer Profile
+            </button>
+          </div>
+          <div className="landing-features">
+            <FeaturePreview icon={<Camera size={20} />} title="Photo diagnosis" text="Check disease, pests, and nutrient deficiency from a crop photo." />
+            <FeaturePreview icon={<Leaf size={20} />} title="Fertilizer advice" text="Get quantity suggestions based on variety, crop age, soil, and weather." />
+            <FeaturePreview icon={<ClipboardList size={20} />} title="Expert feedback" text="Save diagnosis history and let a trusted expert correct AI answers." />
+          </div>
+        </section>
+      )}
+
+      {tab === "language" && (
+        <section className="screen">
+          <div className="language-card">
+            <Languages size={34} />
+            <h2>{copy.languageTitle}</h2>
+            <p>{copy.languageSubtitle}</p>
+            <div className="language-actions">
+              <button className="primary-button" onClick={() => chooseLanguage("te")}>Telugu</button>
+              <button className="secondary-button" onClick={() => chooseLanguage("en")}>English</button>
+            </div>
+          </div>
+        </section>
+      )}
+
       {tab === "home" && (
         <section className="screen">
+          <section className="inside-app">
+            <p className="eyebrow">{copy.homeTitle}</p>
+            <h2>{copy.homeSubtitle}</h2>
+            <div className="inside-grid">
+              <FeaturePreview icon={<Camera size={18} />} title={copy.photoTitle} text={copy.photoText} />
+              <FeaturePreview icon={<Leaf size={18} />} title={copy.pindiTitle} text={copy.pindiText} />
+              <FeaturePreview icon={<ClipboardList size={18} />} title={copy.historyTitle} text={copy.historyText} />
+            </div>
+          </section>
           <div className="field-status">
             <div>
               <p className="eyebrow">Current field</p>
@@ -664,13 +748,13 @@ function App() {
 
       {error && <div className="toast">{error}</div>}
 
-      <nav className="bottom-nav">
+      {canUseApp && <nav className="bottom-nav">
         <NavButton active={tab === "home"} onClick={() => setTab("home")} icon={<Home size={20} />} label="Home" />
         <NavButton active={tab === "photo"} onClick={() => setTab("photo")} icon={<Camera size={20} />} label="Photo" />
         <NavButton active={tab === "fertilizer"} onClick={() => setTab("fertilizer")} icon={<Leaf size={20} />} label="Pindi" />
         <NavButton active={tab === "profile"} onClick={() => setTab("profile")} icon={<UserRound size={20} />} label="Profile" />
         <NavButton active={tab === "history"} onClick={() => { setTab("history"); loadHistory(); }} icon={<ClipboardList size={20} />} label="History" />
-      </nav>
+      </nav>}
     </main>
   );
 }
@@ -734,6 +818,18 @@ function WeatherStrip({ weather }) {
       <span>{weather.humidity_pct ?? "-"}% humidity</span>
       <span>{Math.round(weather.forecast_rain_3d_mm ?? 0)} mm rain / 3d</span>
     </section>
+  );
+}
+
+function FeaturePreview({ icon, title, text }) {
+  return (
+    <article className="feature-preview">
+      <div className="feature-icon">{icon}</div>
+      <div>
+        <strong>{title}</strong>
+        <p>{text}</p>
+      </div>
+    </article>
   );
 }
 
