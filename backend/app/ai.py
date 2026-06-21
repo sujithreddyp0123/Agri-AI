@@ -12,8 +12,8 @@ logger = logging.getLogger(__name__)
 
 
 def resolve_anthropic_model(model: str) -> str:
-    if model == "claude-sonnet-4-6":
-        return "claude-sonnet-4-20250514"
+    if model == "claude-sonnet-4-20250514":
+        return "claude-sonnet-4-6"
     return model
 
 
