@@ -61,6 +61,8 @@ button { cursor: pointer; }
   padding: 16px;
 }
 .landing-hero {
+  position: relative;
+  overflow: hidden;
   display: grid;
   gap: 12px;
   min-height: 430px;
@@ -68,9 +70,24 @@ button { cursor: pointer; }
   border-radius: 8px;
   padding: 22px 18px;
   color: #fff;
-  background:
-    linear-gradient(180deg, rgba(15, 50, 25, .18), rgba(15, 50, 25, .88)),
-    url("https://images.unsplash.com/photo-1592982537447-7440770cbfc9?auto=format&fit=crop&w=1200&q=80") center/cover;
+  background: #14351e;
+}
+.landing-hero::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(15, 50, 25, .10), rgba(15, 50, 25, .88));
+}
+.landing-hero-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.landing-hero > *:not(.landing-hero-image) {
+  position: relative;
+  z-index: 1;
 }
 .landing-hero .eyebrow { color: rgba(255,255,255,.78); }
 .landing-hero h2 {

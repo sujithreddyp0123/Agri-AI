@@ -14,6 +14,7 @@ import {
   verifyOtp,
 } from "./api";
 import "./styles.css";
+import paddyHero from "./assets/paddy-hero.jpg";
 
 const OTHER_OPTION = "Other / Not listed";
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -522,6 +523,7 @@ function App() {
       {tab === "landing" && (
         <section className="landing-screen">
           <div className="landing-hero">
+            <img className="landing-hero-image" src={paddyHero} alt="" />
             <span className="eyebrow">For AP and Telangana farmers</span>
             <h2>Agri AI</h2>
             <p>Crop photo diagnosis, pindi advice, live weather, and expert feedback in one simple farmer app.</p>
