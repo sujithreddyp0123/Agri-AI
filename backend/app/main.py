@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from app.ai import analyze_crop_photo
+from app.ai import resolve_anthropic_model
 from app.config import Settings, get_settings
 from app.database import get_connection, init_db, row_to_dict
 from app.models import (
@@ -50,6 +51,14 @@ async def startup() -> None:
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/ai/status")
+async def ai_status(settings: Settings = Depends(get_settings)) -> dict[str, str | bool]:
+    return {
+        "anthropic_configured": bool(settings.anthropic_api_key),
+        "model": resolve_anthropic_model(settings.anthropic_model),
+    }
 
 
 def detect_stage(days_since_sowing: int) -> tuple[str, str]:

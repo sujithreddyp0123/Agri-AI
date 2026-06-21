@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { CalendarDays, Camera, Check, ClipboardList, Home, Languages, Leaf, Loader2, Save, Sprout, UserRound, X } from "lucide-react";
 import {
@@ -225,6 +225,7 @@ function App() {
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackStatus, setFeedbackStatus] = useState("");
   const [appLanguage, setAppLanguage] = useState(() => localStorage.getItem("agri-ai-language") || "");
+  const photoInputRef = useRef(null);
   const copy = APP_COPY[appLanguage || "en"];
   const isProfileSaved = Boolean(profile.name && profile.phone);
   const canUseApp = isProfileSaved && Boolean(appLanguage);
@@ -495,6 +496,17 @@ function App() {
     }
   }
 
+  function resetPhotoDiagnosis() {
+    setPreview("");
+    setDiagnosis(null);
+    setFeedbackStatus("");
+    setFeedbackText("");
+    setError("");
+    if (photoInputRef.current) {
+      photoInputRef.current.value = "";
+    }
+  }
+
   async function getFertilizer() {
     setFertilizer(null);
     setError("");
@@ -619,8 +631,13 @@ function App() {
             <Camera size={42} />
             <strong>Take or upload crop photo</strong>
             <span>Photo is sent to FastAPI, then AI runs on backend</span>
-            <input type="file" accept="image/*" capture="environment" onChange={onPhotoChange} />
+            <input ref={photoInputRef} type="file" accept="image/*" capture="environment" onChange={onPhotoChange} />
           </label>
+          {(preview || diagnosis) && (
+            <button className="secondary-button reset-button" onClick={resetPhotoDiagnosis}>
+              Reset photo
+            </button>
+          )}
           {preview && <img className="preview" src={preview} alt="Uploaded crop preview" />}
           {loading === "photo" && <Loading text="Analyzing photo..." />}
           {diagnosis && (

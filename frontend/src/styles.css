@@ -336,6 +336,10 @@ input, select {
 .upload-zone input { display: none; }
 .upload-zone svg { color: var(--leaf); }
 .upload-zone span { color: var(--muted); font-size: 13px; }
+.reset-button {
+  width: 100%;
+  margin-top: 12px;
+}
 .photo-context {
   display: flex;
   flex-wrap: wrap;

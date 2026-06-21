@@ -11,6 +11,12 @@ from app.models import DiagnosisResponse, FarmContext
 logger = logging.getLogger(__name__)
 
 
+def resolve_anthropic_model(model: str) -> str:
+    if model == "claude-sonnet-4-6":
+        return "claude-sonnet-4-20250514"
+    return model
+
+
 def _fallback_diagnosis() -> DiagnosisResponse:
     return DiagnosisResponse(
         disease="Needs expert review",
@@ -134,6 +140,7 @@ async def analyze_crop_photo(
     context: FarmContext,
 ) -> DiagnosisResponse:
     if not settings.anthropic_api_key:
+        logger.warning("Anthropic API key is not configured; returning fallback diagnosis.")
         return _fallback_diagnosis()
 
     image_base64 = base64.b64encode(image_bytes).decode("ascii")
@@ -204,7 +211,7 @@ Identify disease, pest damage, or nutrient deficiency if visible.
 """
 
     payload = {
-        "model": settings.anthropic_model,
+        "model": resolve_anthropic_model(settings.anthropic_model),
         "max_tokens": 1200,
         "system": system,
         "messages": [
@@ -237,6 +244,7 @@ Identify disease, pest damage, or nutrient deficiency if visible.
         )
 
     if response.status_code >= 400:
+        logger.warning("Anthropic API error %s: %s", response.status_code, response.text[:1000])
         return _fallback_diagnosis()
 
     data = response.json()
