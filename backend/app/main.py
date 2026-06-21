@@ -6,7 +6,6 @@ import uuid
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from fastapi.staticfiles import StaticFiles
 
 from app.ai import analyze_crop_photo
 from app.config import Settings, get_settings
@@ -41,9 +40,6 @@ app.add_middleware(
 )
 
 FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
-
-if FRONTEND_DIST.exists():
-    app.mount("/assets", StaticFiles(directory=FRONTEND_DIST / "assets"), name="assets")
 
 
 @app.on_event("startup")
@@ -333,6 +329,23 @@ async def photo_diagnosis(
         )
 
     return result
+
+
+@app.get("/assets/{asset_path:path}")
+async def serve_asset(asset_path: str) -> FileResponse:
+    assets_dir = FRONTEND_DIST / "assets"
+    requested_file = assets_dir / asset_path
+
+    if requested_file.exists() and requested_file.is_file():
+        return FileResponse(requested_file)
+
+    extension = Path(asset_path).suffix
+    if extension in {".css", ".js"}:
+        fallback = next(assets_dir.glob(f"*{extension}"), None) if assets_dir.exists() else None
+        if fallback and fallback.is_file():
+            return FileResponse(fallback)
+
+    raise HTTPException(status_code=404, detail="Asset not found")
 
 
 @app.get("/{full_path:path}")
