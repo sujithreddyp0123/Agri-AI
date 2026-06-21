@@ -319,11 +319,6 @@ function App() {
       return;
     }
 
-    if (!otpVerified) {
-      setError("Please verify phone OTP before saving profile.");
-      return;
-    }
-
     setError("");
     setLoading("profile");
 
@@ -676,16 +671,16 @@ function App() {
             <label>Phone
               <input value={profile.phone || ""} onChange={(e) => updateProfile("phone", e.target.value)} inputMode="tel" placeholder="Farmer mobile number" />
             </label>
-            <div className="otp-row">
+            {false && <div className="otp-row">
               <button className="secondary-button" onClick={sendOtp} disabled={loading === "otp"}>
                 {loading === "otp" ? "Sending..." : "Send OTP"}
               </button>
               <span className={otpVerified ? "status-ok" : "status-muted"}>
                 {otpVerified ? "Phone verified" : "Not verified"}
               </span>
-            </div>
-            {devOtp && <div className="dev-otp">Dev OTP: <strong>{devOtp}</strong></div>}
-            {!otpVerified && devOtp && (
+            </div>}
+            {false && devOtp && <div className="dev-otp">Dev OTP: <strong>{devOtp}</strong></div>}
+            {false && !otpVerified && devOtp && (
               <div className="otp-row">
                 <label>Enter OTP
                   <input value={otp} onChange={(e) => setOtp(e.target.value)} inputMode="numeric" placeholder="6 digit OTP" />
